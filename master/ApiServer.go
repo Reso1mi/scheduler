@@ -27,6 +27,7 @@ func InitApiServer() error {
 	)
 	mux = http.NewServeMux()
 	mux.HandleFunc("/job/save", handleJobSave)
+	mux.HandleFunc("/job/delete", handleJobDelete)
 	//启动TCP监听(更底层的操作)
 	if listener, err = net.Listen("tcp", ":"+strconv.Itoa(G_config.ApiPort)); err != nil {
 		return err
@@ -51,14 +52,13 @@ func handleJobSave(w http.ResponseWriter, req *http.Request) {
 	var (
 		err       error
 		postJob   string
-		job       common.Job
-		oldJob    common.Job
+		job       *common.Job
+		oldJob    *common.Job
 		respBytes []byte
 	)
 	//获取表单中的job
 	postJob = req.PostFormValue("job")
-	//反序列化(这里踩了个小坑，明天记录下)
-	//todo 测试下Unmarshal
+	//反序列化(这里踩了个小坑，第二个参数一开始传递的job，相当于传递了一个nil)
 	if err = json.Unmarshal([]byte(postJob), &job); err != nil {
 		goto ERR
 	}
@@ -75,6 +75,34 @@ func handleJobSave(w http.ResponseWriter, req *http.Request) {
 ERR:
 	//异常响应
 	if respBytes, err = common.BuildResp(1, err.Error(), nil); err != nil {
+		w.Write(respBytes)
+	}
+}
+
+//删除任务接口
+//POST:name="job1"
+func handleJobDelete(w http.ResponseWriter, req *http.Request) {
+	var (
+		err       error
+		jobName   string
+		oldJob    *common.Job
+		respBytes []byte
+	)
+	if err = req.ParseForm(); err != nil {
+		goto ERR
+	}
+	jobName = req.PostFormValue("name")
+	if oldJob, err = G_jobManager.DeleteJob(jobName); err != nil {
+		goto ERR
+	}
+	if respBytes, err = common.BuildResp(0, "success", oldJob); err != nil {
+		goto ERR
+	}
+	w.Write(respBytes)
+	return
+ERR:
+	//异常响应
+	if respBytes, err = common.BuildResp(-1, err.Error(), nil); err != nil {
 		w.Write(respBytes)
 	}
 }
