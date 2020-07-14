@@ -2,7 +2,7 @@ package master
 
 import (
 	"encoding/json"
-	"github.com/imlgw/scheduler/master/common"
+	"github.com/imlgw/scheduler/common"
 	"net"
 	"net/http"
 	"strconv"
@@ -20,14 +20,22 @@ type ApiServer struct {
 
 func InitApiServer() error {
 	var (
-		mux        *http.ServeMux
-		listener   net.Listener
-		httpServer *http.Server
-		err        error
+		mux           *http.ServeMux
+		listener      net.Listener
+		httpServer    *http.Server
+		err           error
+		staticDir     http.Dir
+		staticHandler http.Handler
 	)
 	mux = http.NewServeMux()
 	mux.HandleFunc("/job/save", handleJobSave)
 	mux.HandleFunc("/job/delete", handleJobDelete)
+	mux.HandleFunc("/job/list", handleJobList)
+	mux.HandleFunc("/job/kill", handleJobKill)
+	//静态文件目录
+	staticDir = http.Dir(G_config.Webapp)
+	staticHandler = http.FileServer(staticDir)
+	mux.Handle("/", staticHandler)
 	//启动TCP监听(更底层的操作)
 	if listener, err = net.Listen("tcp", ":"+strconv.Itoa(G_config.ApiPort)); err != nil {
 		return err
@@ -59,7 +67,9 @@ func handleJobSave(w http.ResponseWriter, req *http.Request) {
 	//获取表单中的job
 	postJob = req.PostFormValue("job")
 	//反序列化(这里踩了个小坑，第二个参数一开始传递的job，相当于传递了一个nil)
-	if err = json.Unmarshal([]byte(postJob), &job); err != nil {
+	//如果传&job(指针的地址) 实际上这里还是没有赋值，只不过传指针的地址进去后底层会自动的创建一个，但是传一个指针的地址太奇怪了
+	job = &common.Job{} //这样比较好
+	if err = json.Unmarshal([]byte(postJob), job); err != nil {
 		goto ERR
 	}
 	//保存到etcd
@@ -96,6 +106,51 @@ func handleJobDelete(w http.ResponseWriter, req *http.Request) {
 		goto ERR
 	}
 	if respBytes, err = common.BuildResp(0, "success", oldJob); err != nil {
+		goto ERR
+	}
+	w.Write(respBytes)
+	return
+ERR:
+	//异常响应
+	if respBytes, err = common.BuildResp(-1, err.Error(), nil); err != nil {
+		w.Write(respBytes)
+	}
+}
+
+func handleJobList(w http.ResponseWriter, req *http.Request) {
+	var (
+		err       error
+		jobList   []*common.Job
+		respBytes []byte
+	)
+	if jobList, err = G_jobManager.ListJob(); err != nil {
+		goto ERR
+	}
+	if respBytes, err = common.BuildResp(0, "success", jobList); err != nil {
+		goto ERR
+	}
+	w.Write(respBytes)
+	return
+ERR:
+	//异常响应
+	if respBytes, err = common.BuildResp(-1, err.Error(), nil); err != nil {
+		w.Write(respBytes)
+	}
+}
+
+//强制杀死某个任务
+//POST /job/kill name = jobname
+func handleJobKill(w http.ResponseWriter, req *http.Request) {
+	var (
+		err       error
+		jobName   string
+		respBytes []byte
+	)
+	jobName = req.PostFormValue("name")
+	if err = G_jobManager.KillJob(jobName); err != nil {
+		goto ERR
+	}
+	if respBytes, err = common.BuildResp(0, "success", nil); err != nil {
 		goto ERR
 	}
 	w.Write(respBytes)

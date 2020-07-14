@@ -3,5 +3,6 @@
   "apiReadTimeOut": 5000,
   "apiWriteTimeout": 5000,
   "etcdEndpoints": ["120.79.182.28:2379"],
-  "etcdDialTimeout": 5000
+  "etcdDialTimeout": 5000,
+  "webapp": "./webapp"
 }

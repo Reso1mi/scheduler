@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/imlgw/scheduler/master/common"
+	"github.com/coreos/etcd/mvcc/mvccpb"
+	"github.com/imlgw/scheduler/common"
 	"go.etcd.io/etcd/clientv3"
 	"time"
 )
@@ -93,4 +94,53 @@ func (jobMgr *JobManager) DeleteJob(name string) (*common.Job, error) {
 		}
 	}
 	return oldJob, err
+}
+
+func (jobMgr *JobManager) ListJob() ([]*common.Job, error) {
+	var (
+		dirKey  string
+		err     error
+		getResp *clientv3.GetResponse
+		kvPair  *mvccpb.KeyValue
+		jobList []*common.Job
+		job     *common.Job
+	)
+	dirKey = common.JOB_SAVE_DIR
+	if getResp, err = jobMgr.kv.Get(context.TODO(), dirKey, clientv3.WithPrefix()); err != nil {
+		return nil, err
+	}
+	jobList = make([]*common.Job, 0)
+	//遍历所有任务
+	for _, kvPair = range getResp.Kvs {
+		//这里感觉还是应该job=&Job{}再传进去，传一个指针的地址是虽然可以，但是太奇怪了
+		job = &common.Job{}
+		if err = json.Unmarshal(kvPair.Value, &job); err != nil {
+			err = nil
+			continue
+		}
+		jobList = append(jobList, job)
+	}
+	return jobList, err
+}
+
+func (jobMgr *JobManager) KillJob(name string) error {
+	//更新key = /cron/key/killer/name
+	var (
+		killerKey      string
+		err            error
+		leaseGrantResp *clientv3.LeaseGrantResponse
+		leaseID        clientv3.LeaseID
+	)
+	//通知worker杀死任务
+	killerKey = common.JOB_KILL_DIR + name
+	//worker会监听put操作
+	if leaseGrantResp, err = jobMgr.lease.Grant(context.TODO(), 1); err != nil {
+		return err
+	}
+	leaseID = leaseGrantResp.ID
+	//设置killer标记
+	if _, err = jobMgr.kv.Put(context.TODO(), killerKey, "kill", clientv3.WithLease(leaseID)); err != nil {
+		return err
+	}
+	return err
 }
