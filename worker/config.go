@@ -8,6 +8,7 @@ import (
 type Config struct {
 	EtcdEndPoints   []string `json:"etcdEndpoints"`
 	EtcdDialTimeOut int      `json:"etcdDialTimeout"`
+	BashPath        string   `json:"bashPath"`
 }
 
 var (

@@ -10,6 +10,7 @@ type Scheduler struct {
 	jobEventChan      chan *common.JobEvent               //etcd任务事件队列
 	jobPlanTable      map[string]*common.JobSchedulerPlan //任务计划表
 	jobExecutingTable map[string]*common.JobExecuteInfo
+	jobResultChan     chan *common.JobExecuteResult //任务结果队列
 }
 
 var (
@@ -22,6 +23,7 @@ func (scheduler *Scheduler) doScheduler() {
 		jobEvent       *common.JobEvent
 		schedulerAfter time.Duration
 		schedulerTimer *time.Timer
+		jobResult      *common.JobExecuteResult
 	)
 	//初始化（1s）
 	schedulerAfter = scheduler.TrySchedule()
@@ -30,9 +32,11 @@ func (scheduler *Scheduler) doScheduler() {
 	//定时任务
 	for {
 		select {
-		case jobEvent = <-scheduler.jobEventChan:
+		case jobEvent = <-scheduler.jobEventChan: //监听任务变化事件
 			scheduler.handleEvent(jobEvent)
 		case <-schedulerTimer.C: //最近的任务到期了
+		case jobResult = <-scheduler.jobResultChan: //监听任务执行结果
+			scheduler.handleJobResult(jobResult)
 		}
 		schedulerAfter = scheduler.TrySchedule()
 		//重置定时器
@@ -40,21 +44,28 @@ func (scheduler *Scheduler) doScheduler() {
 	}
 }
 
+//处理执行完成的任务
+func (scheduler *Scheduler) handleJobResult(jobResult *common.JobExecuteResult) {
+	//删除执行表中的任务
+	delete(scheduler.jobExecutingTable, jobResult.ExecuteInfo.Job.Name)
+	fmt.Printf("任务【%s】执行完成, output【%s】,Err【%s】\n", jobResult.ExecuteInfo.Job.Name, string(jobResult.Output), jobResult.Err)
+}
+
 //处理任务事件，实时同步etcd中的任务和执行计划表
 func (scheduler *Scheduler) handleEvent(jobEvent *common.JobEvent) {
 	var (
-		err          error
-		jobExist     bool
-		jobScheduler *common.JobSchedulerPlan
+		err      error
+		jobExist bool
+		jobPlan  *common.JobSchedulerPlan
 	)
 	switch jobEvent.EventType {
 	case common.JOB_EVENT_SAVE: //保存任务事件：添加进入计划表
-		if jobScheduler, err = common.BuildJobSchedulePlan(jobEvent.Job); err != nil {
+		if jobPlan, err = common.BuildJobSchedulePlan(jobEvent.Job); err != nil {
 			return
 		}
-		scheduler.jobPlanTable[jobEvent.Job.Name] = jobScheduler
+		scheduler.jobPlanTable[jobEvent.Job.Name] = jobPlan
 	case common.JOB_EVENT_DELETE: //删除任务事件: 从计划表中删除
-		if jobScheduler, jobExist = scheduler.jobPlanTable[jobEvent.Job.Name]; jobExist {
+		if jobPlan, jobExist = scheduler.jobPlanTable[jobEvent.Job.Name]; jobExist {
 			delete(scheduler.jobPlanTable, jobEvent.Job.Name)
 		}
 	}
@@ -108,11 +119,17 @@ func (scheduler *Scheduler) TryStartJob(jobSchedulerPlan *common.JobSchedulerPla
 	scheduler.jobExecutingTable[jobSchedulerPlan.Job.Name] = jobExecuteInfo
 	//TODO:启动shell命令
 	fmt.Printf("执行【%s】任务\n", jobSchedulerPlan.Job.Name)
+	G_executor.ExecutorJob(jobExecuteInfo)
 }
 
-//推送任务变化事件
+//chan推送任务变化事件
 func (scheduler *Scheduler) PushJobEvent(jobEvent *common.JobEvent) {
 	scheduler.jobEventChan <- jobEvent
+}
+
+//chan回传任务执行结果
+func (scheduler *Scheduler) PushJobResult(jobResult *common.JobExecuteResult) {
+	scheduler.jobResultChan <- jobResult
 }
 
 func InitScheduler() error {
@@ -123,6 +140,7 @@ func InitScheduler() error {
 		jobEventChan:      make(chan *common.JobEvent, 1000),
 		jobPlanTable:      make(map[string]*common.JobSchedulerPlan),
 		jobExecutingTable: make(map[string]*common.JobExecuteInfo),
+		jobResultChan:     make(chan *common.JobExecuteResult, 1000),
 	}
 	//启动调度协程
 	go G_scheduler.doScheduler()

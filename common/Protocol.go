@@ -41,6 +41,15 @@ type JobEvent struct {
 	Job       *Job
 }
 
+//任务执行结果
+type JobExecuteResult struct {
+	ExecuteInfo *JobExecuteInfo //执行状态
+	Output      []byte          //shell的输出
+	Err         error           //脚本错误原因
+	StartTime   time.Time       //启动时间
+	EndTime     time.Time       //结束时间
+}
+
 func BuildResp(errno int, msg string, data interface{}) ([]byte, error) {
 	var (
 		err      error

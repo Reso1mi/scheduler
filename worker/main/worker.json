@@ -1,4 +1,5 @@
 {
   "etcdEndpoints": ["120.79.182.28:2379"],
-  "etcdDialTimeout": 5000
+  "etcdDialTimeout": 5000,
+  "bashPath": "E:\\Git\\Git\\bin\\bash.exe"
 }

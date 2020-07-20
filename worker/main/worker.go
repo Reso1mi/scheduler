@@ -31,9 +31,15 @@ func main() {
 	initArgs()
 	//初始化线程
 	initEnv()
+	//加载配置
 	if err = worker.InitConfig(confFile); err != nil {
 		goto ERR
 	}
+	//任务执行器
+	if err = worker.InitExecutor(); err != nil {
+		goto ERR
+	}
+	//任务调度器
 	if err = worker.InitScheduler(); err != nil {
 		goto ERR
 	}
