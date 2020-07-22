@@ -16,6 +16,7 @@ type JobManager struct {
 	watcher clientv3.Watcher
 }
 
+//noinspection ALL
 var (
 	G_jobManager *JobManager
 )
@@ -109,4 +110,9 @@ func (jobMgr *JobManager) watchJobs() error {
 		}
 	}()
 	return err
+}
+
+//创建任务执行锁
+func (jobMgr *JobManager) CreateJobLock(jobName string) *JobLock {
+	return InitJobLock(jobName, jobMgr.kv, jobMgr.lease)
 }

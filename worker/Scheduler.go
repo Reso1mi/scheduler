@@ -13,6 +13,7 @@ type Scheduler struct {
 	jobResultChan     chan *common.JobExecuteResult //任务结果队列
 }
 
+//noinspection ALL
 var (
 	G_scheduler *Scheduler
 )
