@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"context"
 	"github.com/imlgw/scheduler/common"
 	"os/exec"
 	"time"
@@ -34,6 +33,7 @@ func (executor *Executor) ExecutorJob(info *common.JobExecuteInfo) {
 		//任务开始时间
 		result.StartTime = time.Now()
 		//尝试上锁
+		//TODO: 分布式锁的偏向
 		err = jobLock.TryLock()
 		defer jobLock.Unlock()
 		if err != nil { //上锁失败
@@ -42,8 +42,8 @@ func (executor *Executor) ExecutorJob(info *common.JobExecuteInfo) {
 		} else {
 			//真实的启动时间
 			result.StartTime = time.Now()
-			//创建shell命令
-			cmd = exec.CommandContext(context.TODO(), G_config.BashPath, "-c", info.Job.Command)
+			//创建shell命令，传入cancelCtx
+			cmd = exec.CommandContext(info.CancelCtx, G_config.BashPath, "-c", info.Job.Command)
 			//执行并捕获输出
 			output, err = cmd.CombinedOutput()
 			//记录任务结束时间

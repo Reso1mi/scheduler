@@ -55,9 +55,10 @@ func (scheduler *Scheduler) handleJobResult(jobResult *common.JobExecuteResult) 
 //处理任务事件，实时同步etcd中的任务和执行计划表
 func (scheduler *Scheduler) handleEvent(jobEvent *common.JobEvent) {
 	var (
-		err      error
-		jobExist bool
-		jobPlan  *common.JobSchedulerPlan
+		err            error
+		jobExist       bool
+		jobPlan        *common.JobSchedulerPlan
+		jobExecuteInfo *common.JobExecuteInfo
 	)
 	switch jobEvent.EventType {
 	case common.JOB_EVENT_SAVE: //保存任务事件：添加进入计划表
@@ -68,6 +69,12 @@ func (scheduler *Scheduler) handleEvent(jobEvent *common.JobEvent) {
 	case common.JOB_EVENT_DELETE: //删除任务事件: 从计划表中删除
 		if jobPlan, jobExist = scheduler.jobPlanTable[jobEvent.Job.Name]; jobExist {
 			delete(scheduler.jobPlanTable, jobEvent.Job.Name)
+		}
+	case common.JOB_EVENT_KILL: //强杀任务事件：取消command执行
+		if jobExecuteInfo, jobExist = scheduler.jobExecutingTable[jobEvent.Job.Name]; jobExist {
+			//cancel任务，除法command杀死子进程，任务得到退出
+			jobExecuteInfo.CancelFunc()
+			fmt.Printf("当前任务【%s】被kill！！！\n", jobExecuteInfo.Job.Name)
 		}
 	}
 }
@@ -89,8 +96,8 @@ func (scheduler *Scheduler) TrySchedule() time.Duration {
 		if jobSchedulePlan.NextTime.Before(now) || jobSchedulePlan.NextTime.Equal(now) {
 			//2. 过期的任务立即执行
 			//尝试执行任务
+			fmt.Printf("TrySchedule：任务 [%s] 被调度\n", jobSchedulePlan.Job.Name)
 			scheduler.TryStartJob(jobSchedulePlan)
-			fmt.Printf("任务 [%s] 被执行\n", jobSchedulePlan.Job.Name)
 			jobSchedulePlan.NextTime = jobSchedulePlan.Expr.Next(now) //更新下次执行时间
 		}
 		//统计最近一个要过期的任务
@@ -119,7 +126,7 @@ func (scheduler *Scheduler) TryStartJob(jobSchedulerPlan *common.JobSchedulerPla
 	//更新执行表
 	scheduler.jobExecutingTable[jobSchedulerPlan.Job.Name] = jobExecuteInfo
 	//TODO:启动shell命令
-	fmt.Printf("执行【%s】任务\n", jobSchedulerPlan.Job.Name)
+	fmt.Printf("TryStartJob：开始尝试执行【%s】任务\n", jobSchedulerPlan.Job.Name)
 	G_executor.ExecutorJob(jobExecuteInfo)
 }
 

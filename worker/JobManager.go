@@ -52,6 +52,7 @@ func InitJobManager() error {
 	}
 	//启动监听
 	G_jobManager.watchJobs()
+	G_jobManager.watchKiller()
 	return err
 }
 
@@ -98,7 +99,7 @@ func (jobMgr *JobManager) watchJobs() error {
 					jobEvent = common.BuildJobEvent(common.JOB_EVENT_SAVE, job)
 					//TODO:反序列化，推送给scheduler
 				case mvccpb.DELETE: //任务删除事件
-					jobName = common.StripDir(string(watchEvent.Kv.Key))
+					jobName = common.StripDir(common.JOB_SAVE_DIR, string(watchEvent.Kv.Key))
 					job = &common.Job{Name: jobName}
 					//构造删除Event
 					jobEvent = common.BuildJobEvent(common.JOB_EVENT_DELETE, job)
@@ -115,4 +116,31 @@ func (jobMgr *JobManager) watchJobs() error {
 //创建任务执行锁
 func (jobMgr *JobManager) CreateJobLock(jobName string) *JobLock {
 	return InitJobLock(jobName, jobMgr.kv, jobMgr.lease)
+}
+
+func (jobMgr *JobManager) watchKiller() {
+	var (
+		job        *common.Job
+		watchChan  clientv3.WatchChan
+		watchResp  clientv3.WatchResponse
+		watchEvent *clientv3.Event
+		jobName    string
+		jobEvent   *common.JobEvent
+	)
+	go func() {
+		//监听KILL_DIR的变化
+		watchChan = jobMgr.watcher.Watch(context.TODO(), common.JOB_KILL_DIR, clientv3.WithPrefix())
+		for watchResp = range watchChan {
+			for _, watchEvent = range watchResp.Events {
+				switch watchEvent.Type {
+				case mvccpb.PUT: //kill任务事件，会向KILL_SAVE目录put值
+					jobName = common.StripDir(common.JOB_KILL_DIR, string(watchEvent.Kv.Key))
+					job = &common.Job{Name: jobName}
+					jobEvent = common.BuildJobEvent(common.JOB_EVENT_KILL, job)
+					//推送给scheduler
+					G_scheduler.PushJobEvent(jobEvent)
+				}
+			}
+		}
+	}()
 }
