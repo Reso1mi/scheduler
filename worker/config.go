@@ -6,9 +6,16 @@ import (
 )
 
 type Config struct {
-	EtcdEndPoints   []string `json:"etcdEndpoints"`
-	EtcdDialTimeOut int      `json:"etcdDialTimeout"`
-	BashPath        string   `json:"bashPath"`
+	EtcdEndPoints       []string `json:"etcdEndpoints"`
+	EtcdDialTimeOut     int      `json:"etcdDialTimeout"`
+	BashPath            string   `json:"bashPath"`
+	DbUri               string   `json:"dbUri"`
+	DbName              string   `json:"dbName"`
+	DbUsername          string   `json:"dbUsername"`
+	DbPassword          string   `json:"dbPassword"`
+	LogChanLen          int      `json:"logChanLen"`
+	JobLogBatchSize     int      `json:"jobLogBatchSize"`
+	JobLogCommitTimeOut int      `json:"jobLogCommitTimeOut"`
 }
 
 var (

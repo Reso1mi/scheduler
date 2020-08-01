@@ -2,6 +2,7 @@ package worker
 
 import (
 	"github.com/imlgw/scheduler/common"
+	"math/rand"
 	"os/exec"
 	"time"
 )
@@ -34,6 +35,7 @@ func (executor *Executor) ExecutorJob(info *common.JobExecuteInfo) {
 		result.StartTime = time.Now()
 		//尝试上锁
 		//TODO: 分布式锁的偏向
+		time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 		err = jobLock.TryLock()
 		defer jobLock.Unlock()
 		if err != nil { //上锁失败

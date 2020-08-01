@@ -34,6 +34,10 @@ func main() {
 	if err = master.InitConfig(confFile); err != nil {
 		goto ERR
 	}
+	//日志（查询）管理器
+	if err = master.InitLogManager(); err != nil {
+		goto ERR
+	}
 	//任务管理器
 	if err = master.InitJobManager(); err != nil {
 		goto ERR

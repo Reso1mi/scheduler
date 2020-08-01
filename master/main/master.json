@@ -4,5 +4,9 @@
   "apiWriteTimeout": 5000,
   "etcdEndpoints": ["120.79.182.28:2379"],
   "etcdDialTimeout": 5000,
-  "webapp": "./webapp"
+  "webapp": "./webapp",
+  "dbUri": "127.0.0.1:3306",
+  "dbName" : "scheduler_log",
+  "dbUsername" :"root",
+  "dbPassword": "admin"
 }

@@ -47,8 +47,31 @@ func (scheduler *Scheduler) doScheduler() {
 
 //处理执行完成的任务
 func (scheduler *Scheduler) handleJobResult(jobResult *common.JobExecuteResult) {
+	var (
+		jobLog *common.JobLog
+	)
 	//删除执行表中的任务
 	delete(scheduler.jobExecutingTable, jobResult.ExecuteInfo.Job.Name)
+	//生成指向日志
+	if jobResult.Err != common.ERR_LOCK_ALREADY_OCCUPY {
+		jobLog = &common.JobLog{
+			JobName: jobResult.ExecuteInfo.Job.Name,
+			Command: jobResult.ExecuteInfo.Job.Command,
+			Output:  string(jobResult.Output),
+			//ms级别
+			PlanTime:     jobResult.ExecuteInfo.PlanTime.UnixNano() / 1000 / 1000,
+			ScheduleTime: jobResult.ExecuteInfo.RealTime.UnixNano() / 1000 / 1000,
+			StartTime:    jobResult.StartTime.UnixNano() / 1000 / 1000,
+			EndTime:      jobResult.EndTime.UnixNano() / 1000 / 1000,
+		}
+		if jobResult.Err != nil {
+			jobLog.Err = jobResult.Err.Error()
+		} else {
+			jobLog.Err = ""
+		}
+		//存储到MySQL
+		G_logSink.AppendLog(jobLog)
+	}
 	fmt.Printf("任务【%s】执行完成, output【%s】,Err【%s】\n", jobResult.ExecuteInfo.Job.Name, string(jobResult.Output), jobResult.Err)
 }
 

@@ -12,6 +12,10 @@ type Config struct {
 	EtcdEndPoints   []string `json:"etcdEndpoints"`
 	EtcdDialTimeOut int      `json:"etcdDialTimeout"`
 	Webapp          string   `json:"webapp"`
+	DbUri           string   `json:"dbUri"`
+	DbName          string   `json:"dbName"`
+	DbUsername      string   `json:"dbUsername"`
+	DbPassword      string   `json:"dbPassword"`
 }
 
 var (

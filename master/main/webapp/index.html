@@ -233,8 +233,7 @@
 
             // 获取任务名
             var jobName = $(this).parents('tr').children('.job-name').text()
-
-            // 请求/job/log接口
+            // 请求/job/log接口 分页功能后端写了，前端还没写，懒得写，也不太会写。。。
             $.ajax({
                 url: "/job/log",
                 dataType: 'json',

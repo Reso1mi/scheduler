@@ -32,6 +32,7 @@ func InitApiServer() error {
 	mux.HandleFunc("/job/delete", handleJobDelete)
 	mux.HandleFunc("/job/list", handleJobList)
 	mux.HandleFunc("/job/kill", handleJobKill)
+	mux.HandleFunc("/job/log", handleJobLog)
 	//静态文件目录
 	staticDir = http.Dir(G_config.Webapp)
 	staticHandler = http.FileServer(staticDir)
@@ -52,6 +53,40 @@ func InitApiServer() error {
 	//启动了服务端
 	go httpServer.Serve(listener)
 	return err
+}
+
+//查询任务日志
+func handleJobLog(w http.ResponseWriter, req *http.Request) {
+	var (
+		err       error
+		name      string
+		offset    int
+		limit     int
+		respBytes []byte
+		logs      []*common.JobLog
+	)
+	//获取请求参数 /job/log?name=job&offset=0&limit=10
+	name = req.FormValue("name")
+	if offset, err = strconv.Atoi(req.FormValue("offset")); err != nil {
+		offset = 0
+	}
+	if limit, err = strconv.Atoi(req.FormValue("limit")); err != nil {
+		limit = 20
+	}
+	if logs, err = G_logManager.ListLogs(name, offset, limit); err != nil {
+		goto ERR
+	}
+	//响应客户端
+	if respBytes, err = common.BuildResp(0, "success", logs); err != nil {
+		goto ERR
+	}
+	w.Write(respBytes)
+	return //感觉用了goto之后需要额外的注意return...
+ERR:
+	//异常响应
+	if respBytes, err = common.BuildResp(1, err.Error(), nil); err != nil {
+		w.Write(respBytes)
+	}
 }
 
 //保存任务接口

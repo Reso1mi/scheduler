@@ -1,5 +1,12 @@
 {
   "etcdEndpoints": ["120.79.182.28:2379"],
   "etcdDialTimeout": 5000,
-  "bashPath": "E:\\Git\\Git\\bin\\bash.exe"
+  "bashPath": "E:\\Git\\Git\\bin\\bash.exe",
+  "dbUri": "127.0.0.1:3306",
+  "dbName" : "scheduler_log",
+  "dbUsername" :"root",
+  "dbPassword": "admin",
+  "logChanLen" : 1000,
+  "jobLogBatchSize": 100,
+  "jobLogCommitTimeOut" : 1000
 }

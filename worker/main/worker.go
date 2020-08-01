@@ -35,6 +35,10 @@ func main() {
 	if err = worker.InitConfig(confFile); err != nil {
 		goto ERR
 	}
+	//日志（append）管理器
+	if err = worker.InitLogSink(); err != nil {
+		goto ERR
+	}
 	//任务执行器
 	if err = worker.InitExecutor(); err != nil {
 		goto ERR

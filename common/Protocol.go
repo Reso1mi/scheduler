@@ -53,6 +53,24 @@ type JobExecuteResult struct {
 	EndTime     time.Time       //结束时间
 }
 
+//优化点：日志以批次的形式发送去存储
+type LogBatch struct {
+	Logs []*JobLog
+}
+
+//任务日志
+type JobLog struct {
+	ID           int    `gorm:"AUTO_INCREMENT;primary_key;not null" json:"id"` //主键
+	JobName      string `gorm:"type:varchar(100)" json:"jobName"`              //任务名                                            //任务名
+	Command      string `gorm:"type:text" json:"command"`                      //脚本命令
+	Err          string `gorm:"type:varchar(3000)" json:"err"`                 //错误原因
+	Output       string `gorm:"type:varchar(3000)" json:"output"`              //脚本输出
+	PlanTime     int64  `gorm:"type:bigint(20)" json:"planTime"`               //计划调度时间
+	ScheduleTime int64  `gorm:"type:bigint(20)" json:"scheduleTime"`           //实际调度时间
+	StartTime    int64  `gorm:"type:bigint(20)" json:"startTime"`              //任务开始指向时间
+	EndTime      int64  `gorm:"type:bigint(20)" json:"endTime"`                //任务结束时间
+}
+
 func BuildResp(errno int, msg string, data interface{}) ([]byte, error) {
 	var (
 		err      error
