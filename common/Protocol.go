@@ -96,6 +96,7 @@ func UnmarshalJob(data []byte) (*Job, error) {
 	return job, nil
 }
 
+//脱去目录前缀，获得最后的内容
 //删除任务目录前缀，获取任务名
 func StripDir(dirPrefix string, jobKey string) string {
 	return strings.TrimPrefix(jobKey, dirPrefix)

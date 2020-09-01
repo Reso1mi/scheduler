@@ -33,6 +33,7 @@ func InitApiServer() error {
 	mux.HandleFunc("/job/list", handleJobList)
 	mux.HandleFunc("/job/kill", handleJobKill)
 	mux.HandleFunc("/job/log", handleJobLog)
+	mux.HandleFunc("/worker/list", handleWorkerList)
 	//静态文件目录
 	staticDir = http.Dir(G_config.Webapp)
 	staticHandler = http.FileServer(staticDir)
@@ -53,6 +54,28 @@ func InitApiServer() error {
 	//启动了服务端
 	go httpServer.Serve(listener)
 	return err
+}
+
+//服务发现，获取在线节点
+func handleWorkerList(w http.ResponseWriter, req *http.Request) {
+	var (
+		err        error
+		workerList []string
+		respBytes  []byte
+	)
+	if workerList, err = G_workerManager.ListWorkers(); err != nil {
+		goto ERR
+	}
+	if respBytes, err = common.BuildResp(0, "success", workerList); err != nil {
+		goto ERR
+	}
+	w.Write(respBytes)
+	return
+ERR:
+	//异常响应
+	if respBytes, err = common.BuildResp(-1, err.Error(), nil); err != nil {
+		w.Write(respBytes)
+	}
 }
 
 //查询任务日志
