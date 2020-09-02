@@ -106,20 +106,20 @@ func (m *Mutex) Lock(ctx context.Context) error {
 	s := m.s
 	client := m.s.Client()
 
-    m.myKey = fmt.Sprintf("%s%x", m.pfx, s.Lease())
-    //比较加锁的key的修订版本是否是0。如果是0就代表这个锁不存在。
+	m.myKey = fmt.Sprintf("%s%x", m.pfx, s.Lease())
+	//比较加锁的key的修订版本是否是0。如果是0就代表这个锁不存在。
 	cmp := v3.Compare(v3.CreateRevision(m.myKey), "=", 0)
-    // put self in lock waiters via myKey; oldest waiter holds lock
-    //向加锁的key中存储一个空值，这个操作就是一个加锁的操作，可以看出这里是没有锁竞争的问题的
-    //这里租约的ttl就是session的过期时间，session创建后会自动给这个租约续租
+	// put self in lock waiters via myKey; oldest waiter holds lock
+	//向加锁的key中存储一个空值，这个操作就是一个加锁的操作，可以看出这里是没有锁竞争的问题的
+	//这里租约的ttl就是session的过期时间，session创建后会自动给这个租约续租
 	put := v3.OpPut(m.myKey, "", v3.WithLease(s.Lease()))
-    // reuse key in case this session already holds the lock
-    //获取当前节点的key
+	// reuse key in case this session already holds the lock
+	//获取当前节点的key
 	get := v3.OpGet(m.myKey)
-    // fetch current holder to complete uncontended path with only one RPC
-    //获取当前锁的拥有者（通过prefix查询最小的revision）
-    getOwner := v3.OpGet(m.pfx, v3.WithFirstCreate()...)
-    //将上面的合并成一个事务操作
+	// fetch current holder to complete uncontended path with only one RPC
+	//获取当前锁的拥有者（通过prefix查询最小的revision）
+	getOwner := v3.OpGet(m.pfx, v3.WithFirstCreate()...)
+	//将上面的合并成一个事务操作
 	resp, err := client.Txn(ctx).If(cmp).Then(put, getOwner).Else(get, getOwner).Commit()
 	if err != nil {
 		return err
@@ -128,21 +128,21 @@ func (m *Mutex) Lock(ctx context.Context) error {
 	if !resp.Succeeded {
 		m.myRev = resp.Responses[0].GetResponseRange().Kvs[0].CreateRevision
 	}
-    // if no key on prefix / the minimum rev is key, already hold the lock
-    ownerKey := resp.Responses[1].GetResponseRange().Kvs
-    //如果没有人持有锁，或者自己就是锁的持有者就直接返回了
+	// if no key on prefix / the minimum rev is key, already hold the lock
+	ownerKey := resp.Responses[1].GetResponseRange().Kvs
+	//如果没有人持有锁，或者自己就是锁的持有者就直接返回了
 	if len(ownerKey) == 0 || ownerKey[0].CreateRevision == m.myRev {
 		m.hdr = resp.Header
 		return nil
 	}
-    //否则说明锁被占用了，就要等前一个revision释放锁
+	//否则说明锁被占用了，就要等前一个revision释放锁
 	// wait for deletion revisions prior to myKey
 	hdr, werr := waitDeletes(ctx, client, m.pfx, m.myRev-1)
 	// release lock key if wait failed
 	if werr != nil {
 		m.Unlock(client.Ctx())
 	} else {
-        //获得锁
+		//获得锁
 		m.hdr = hdr
 	}
 	return werr
@@ -153,14 +153,14 @@ func (m *Mutex) Lock(ctx context.Context) error {
 // waitDeletes efficiently waits until all keys matching the prefix and no greater
 // than the create revision.
 func waitDeletes(ctx context.Context, client *v3.Client, pfx string, maxCreateRev int64) (*pb.ResponseHeader, error) {
-    //注意这两个option，通过这两个option就可以获取当前rev的前一个key
+	//注意这两个option，通过这两个option就可以获取当前rev的前一个key
 	getOpts := append(v3.WithLastCreate(), v3.WithMaxCreateRev(maxCreateRev))
 	for {
 		resp, err := client.Get(ctx, pfx, getOpts...)
 		if err != nil {
 			return nil, err
-        }
-        //没有小于当前revision的key了，说明前一个以及被删除了，当前节点获取锁
+		}
+		//没有小于当前revision的key了，说明前一个以及被删除了，当前节点获取锁
 		if len(resp.Kvs) == 0 {
 			return resp.Header, nil
 		}
@@ -175,13 +175,13 @@ func waitDelete(ctx context.Context, client *v3.Client, key string, rev int64) e
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-    var wr v3.WatchResponse
-    //watch前一个revision
-    wch := client.Watch(cctx, key, v3.WithRev(rev))
-    //wch是一个channel
+	var wr v3.WatchResponse
+	//watch前一个revision
+	wch := client.Watch(cctx, key, v3.WithRev(rev))
+	//wch是一个channel
 	for wr = range wch {
 		for _, ev := range wr.Events {
-            //如果被删除则返回
+			//如果被删除则返回
 			if ev.Type == mvccpb.DELETE {
 				return nil
 			}
